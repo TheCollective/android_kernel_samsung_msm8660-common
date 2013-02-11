@@ -1761,7 +1761,6 @@ static void msm_chg_detect_work(struct work_struct *w)
 		msm_chg_enable_aca_intr(motg);
 		dev_dbg(otg->dev, "chg_type = %s\n",
 			chg_to_string(motg->chg_type));
-
 		schedule_work(&motg->sm_work);
 		return;
 	default:
