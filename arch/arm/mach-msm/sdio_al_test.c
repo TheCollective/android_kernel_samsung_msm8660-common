@@ -1,4 +1,4 @@
-/* Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -370,7 +370,7 @@ static int sdio_al_test_extract_number(const char __user *buf,
 {
 	int ret = 0;
 	int number = -1;
-	char local_buf[MAX_STR_SIZE+1] = {0};
+	char local_buf[MAX_STR_SIZE] = {0};
 	char *start = NULL;
 
 	if (count > MAX_STR_SIZE) {
@@ -2537,7 +2537,7 @@ static int sdio_al_test_debugfs_init(void)
 
 	test_ctx->debug.host_sender_no_lp_diag_rpc_test =
 		debugfs_create_file("170_host_sender_no_lp_diag_rpc_test",
-				     S_IRUGO | S_IWUGO,
+				     S_IRUGO | S_IWUSR |S_IWGRP,
 				     test_ctx->debug.debug_root,
 				     NULL,
 				     &host_sender_no_lp_diag_rpc_test_ops);
@@ -6409,10 +6409,6 @@ static int __init test_init(void)
 #endif
 
 	test_class = class_create(THIS_MODULE, TEST_MODULE_NAME);
-    if (IS_ERR(test_class)) {
-        pr_err(TEST_MODULE_NAME ":class_create err.\n") ;
-        return -ENODEV ;
-    }
 
 	ret = alloc_chrdev_region(&test_ctx->dev_num, 0, 1, TEST_MODULE_NAME);
 	if (ret) {

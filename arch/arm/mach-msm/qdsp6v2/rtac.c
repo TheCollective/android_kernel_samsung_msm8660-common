@@ -1,4 +1,4 @@
-/* Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2011, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -487,11 +487,11 @@ u32 send_adm_apr(void *buf, u32 opcode)
 		payload_size);
 	adm_params.src_svc = APR_SVC_ADM;
 	adm_params.src_domain = APR_DOMAIN_APPS;
-	adm_params.src_port = copp_id;
+	adm_params.src_port = port_index;
 	adm_params.dest_svc = APR_SVC_ADM;
 	adm_params.dest_domain = APR_DOMAIN_ADSP;
 	adm_params.dest_port = copp_id;
-	adm_params.token = copp_id;
+	adm_params.token = port_index;
 	adm_params.opcode = opcode;
 
 	memcpy(rtac_adm_buffer, &adm_params, sizeof(adm_params));
@@ -986,7 +986,6 @@ static int __init rtac_init(void)
 	if (rtac_asm_buffer == NULL) {
 		pr_err("%s: Could not allocate payload of size = %d\n",
 			__func__, RTAC_BUF_SIZE);
-		kfree(rtac_adm_buffer);
 		goto nomem;
 	}
 
@@ -1004,8 +1003,6 @@ static int __init rtac_init(void)
 	if (rtac_voice_buffer == NULL) {
 		pr_err("%s: Could not allocate payload of size = %d\n",
 			__func__, RTAC_BUF_SIZE);
-		kfree(rtac_adm_buffer);
-		kfree(rtac_asm_buffer);
 		goto nomem;
 	}
 

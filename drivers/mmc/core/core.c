@@ -1424,35 +1424,12 @@ static unsigned int mmc_erase_timeout(struct mmc_card *card,
 		return mmc_mmc_erase_timeout(card, arg, qty);
 }
 
-#define UNSTUFF_BITS(resp, start, size)					\
-	({								\
-		const int __size = size;				\
-		const u32 __mask = (__size < 32 ? 1 << __size : 0) - 1;	\
-		const int __off = 3 - ((start) / 32);			\
-		const int __shft = (start) & 31;			\
-		u32 __res;						\
-									\
-		__res = resp[__off] >> __shft;				\
-		if (__size + __shft > 32)				\
-			__res |= resp[__off-1] << ((32 - __shft) % 32);	\
-		__res & __mask;						\
-	})
-
 static int mmc_do_erase(struct mmc_card *card, unsigned int from,
 			unsigned int to, unsigned int arg)
 {
 	struct mmc_command cmd = {0};
 	unsigned int qty = 0;
 	int err;
-
-	u32 *resp = card->raw_csd;
-
-	/* For WriteProtection */
-	if (UNSTUFF_BITS(resp, 12, 2)) {
-		printk(KERN_ERR "eMMC set Write Protection mode, Can't be written or erased.");
-		err = -EIO;
-		goto out;
-	}
 
 	/*
 	 * qty is used to calculate the erase timeout which depends on how many
@@ -1542,14 +1519,6 @@ static int mmc_do_erase(struct mmc_card *card, unsigned int from,
 			err = -EIO;
 			goto out;
 		}
-
-		if (cmd.resp[0] & R1_WP_ERASE_SKIP) {
-			printk(KERN_ERR "error %d requesting status %#x (R1_WP_ERASE_SKIP)\n",
-				err, cmd.resp[0]);
-			err = -EIO;
-			goto out;
-		}
-
 	} while (!(cmd.resp[0] & R1_READY_FOR_DATA) ||
 		 R1_CURRENT_STATE(cmd.resp[0]) == 7);
 out:
@@ -1570,15 +1539,61 @@ int mmc_erase(struct mmc_card *card, unsigned int from, unsigned int nr,
 {
 	unsigned int rem, to = from + nr;
 
-	printk("%s: mmc_erase() disabled for protection. from = %u, nr = %u, arg = %u\n",
-			__func__,from,nr,arg);
-	return -EOPNOTSUPP;
+	if (!(card->host->caps & MMC_CAP_ERASE) ||
+	    !(card->csd.cmdclass & CCC_ERASE))
+		return -EOPNOTSUPP;
+
+	if (!card->erase_size)
+		return -EOPNOTSUPP;
+
+	if (mmc_card_sd(card) && arg != MMC_ERASE_ARG)
+		return -EOPNOTSUPP;
+
+	if ((arg & MMC_SECURE_ARGS) &&
+	    !(card->ext_csd.sec_feature_support & EXT_CSD_SEC_ER_EN))
+		return -EOPNOTSUPP;
+
+	if ((arg & MMC_TRIM_ARGS) &&
+	    !(card->ext_csd.sec_feature_support & EXT_CSD_SEC_GB_CL_EN))
+		return -EOPNOTSUPP;
+
+	if (arg == MMC_SECURE_ERASE_ARG) {
+		if (from % card->erase_size || nr % card->erase_size)
+			return -EINVAL;
+	}
+
+	if (arg == MMC_ERASE_ARG) {
+		rem = from % card->erase_size;
+		if (rem) {
+			rem = card->erase_size - rem;
+			from += rem;
+			if (nr > rem)
+				nr -= rem;
+			else
+				return 0;
+		}
+		rem = nr % card->erase_size;
+		if (rem)
+			nr -= rem;
+	}
+
+	if (nr == 0)
+		return 0;
+
+	to = from + nr;
+
+	if (to <= from)
+		return -EINVAL;
+
+	/* 'from' and 'to' are inclusive */
+	to -= 1;
+
+	return mmc_do_erase(card, from, to, arg);
 }
 EXPORT_SYMBOL(mmc_erase);
 
 int mmc_can_erase(struct mmc_card *card)
 {
-	printk("%s: called\n",__func__);
 	if ((card->host->caps & MMC_CAP_ERASE) &&
 	    (card->csd.cmdclass & CCC_ERASE) && card->erase_size)
 		return 1;
@@ -1590,23 +1605,9 @@ int mmc_can_trim(struct mmc_card *card)
 {
 	if (card->ext_csd.sec_feature_support & EXT_CSD_SEC_GB_CL_EN)
 		return 1;
-	if (mmc_can_discard(card))
-		return 1;
 	return 0;
 }
 EXPORT_SYMBOL(mmc_can_trim);
-
-int mmc_can_discard(struct mmc_card *card)
-{
-	/*
-	 * As there's no way to detect the discard support bit at v4.5
-	 * use the s/w feature support filed.
-	 */
-	if (card->ext_csd.feature_support & MMC_DISCARD_FEATURE)
-		return 1;
-	return 0;
-}
-EXPORT_SYMBOL(mmc_can_discard);
 
 int mmc_can_secure_erase_trim(struct mmc_card *card)
 {
@@ -1925,7 +1926,12 @@ int mmc_suspend_host(struct mmc_host *host)
 		cancel_delayed_work(&host->disable);
 	if (cancel_delayed_work(&host->detect))
 		wake_unlock(&host->detect_wake_lock);
-	mmc_flush_scheduled_work();
+
+	/* If there is pending detect work abort runtime suspend*/
+	if (unlikely(work_busy(&host->detect.work)))
+		return -EAGAIN;
+	else
+		mmc_flush_scheduled_work();
 
 	mmc_bus_get(host);
 	if (host->bus_ops && !host->bus_dead) {
@@ -1973,12 +1979,15 @@ int mmc_suspend_host(struct mmc_host *host)
 
 	if (!err && !mmc_card_keep_power(host))
 		mmc_power_off(host);
-    
-#if defined(CONFIG_TARGET_SERIES_P8LTE) || defined(CONFIG_USA_MODEL_SGH_T769) || defined(CONFIG_USA_MODEL_SGH_I577)
-    if (host->card && host->index == 2)// T-FLASH card
-        mdelay(50);
-#endif
 
+#if defined (CONFIG_KOR_MODEL_SHV_E160S) || defined(CONFIG_KOR_MODEL_SHV_E160K) || defined (CONFIG_KOR_MODEL_SHV_E160L) || \
+	defined (CONFIG_KOR_MODEL_SHV_E120S) || defined(CONFIG_KOR_MODEL_SHV_E120K) || defined (CONFIG_KOR_MODEL_SHV_E120L) || \
+	defined (CONFIG_KOR_MODEL_SHV_E110S)
+	
+#else
+	if (host->card && host->index == 2 )
+		mdelay(50);
+#endif
 	return err;
 }
 
@@ -2034,7 +2043,7 @@ EXPORT_SYMBOL(mmc_resume_host);
 
 /* Do the card removal on suspend if card is assumed removeable
  * Do that in pm notifier while userspace isn't yet frozen, so we will be able
- * to sync the card.
+   to sync the card.
 */
 int mmc_pm_notify(struct notifier_block *notify_block,
 					unsigned long mode, void *unused)

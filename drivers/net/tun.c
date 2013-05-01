@@ -417,6 +417,8 @@ static netdev_tx_t tun_net_xmit(struct sk_buff *skb, struct net_device *dev)
 	 * for indefinite time. */
 	skb_orphan(skb);
 
+	nf_reset(skb);
+
 	/* Enqueue packet */
 	skb_queue_tail(&tun->socket.sk->sk_receive_queue, skb);
 
@@ -1639,9 +1641,8 @@ static int __init tun_init(void)
 	int ret = 0;
 
 	pr_info("%s, %s\n", DRV_DESCRIPTION, DRV_VERSION);
-#if !defined(CONFIG_USA_MODEL_SGH_I727R) && !defined(CONFIG_USA_MODEL_SGH_I577)
 	pr_info("%s\n", DRV_COPYRIGHT);
-#endif
+
 	ret = rtnl_link_register(&tun_link_ops);
 	if (ret) {
 		pr_err("Can't register link_ops\n");

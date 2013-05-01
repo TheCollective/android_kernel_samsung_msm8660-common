@@ -31,7 +31,6 @@
 #include <linux/syscore_ops.h>
 
 #include <trace/events/power.h>
-#include <linux/semaphore.h>
 
 /**
  * The "cpufreq driver" - the arch- or hardware-dependent low
@@ -433,30 +432,7 @@ static ssize_t store_##file_name					\
 }
 
 store_one(scaling_min_freq, min);
-#ifdef CONFIG_SEC_DVFS
-static ssize_t store_scaling_max_freq
-(struct cpufreq_policy *policy, const char *buf, size_t count)
-{									
-	unsigned int ret = -EINVAL;
-	unsigned int value = 0;
-	
-	ret = sscanf(buf, "%u", &value);
-	if (ret != 1)							
-		return -EINVAL;
-
-	if (policy->cpu == BOOT_CPU) 
-{									
-		if (value >= MAX_FREQ_LIMIT)
-			set_freq_limit(DVFS_THERMALD_ID, -1);
-		else if (value >= MIN_FREQ_LIMIT)
-			set_freq_limit(DVFS_THERMALD_ID, value);
-	}
-
-	return count;
-}
-#else
 store_one(scaling_max_freq, max);
-#endif
 
 /**
  * show_cpuinfo_cur_freq - current CPU frequency as detected by hardware
@@ -1185,6 +1161,7 @@ static int __cpufreq_remove_dev(struct sys_device *sys_dev)
 	cmp = &data->kobj_unregister;
 	unlock_policy_rwsem_write(cpu);
 	kobject_put(kobj);
+
 	/* we need to make sure that the underlying kobj is actually
 	 * not referenced anymore by anybody before we proceed with
 	 * unloading.
@@ -1853,7 +1830,7 @@ static int __cpuinit cpufreq_cpu_callback(struct notifier_block *nfb,
 #ifdef CONFIG_SEC_DVFS
 			if (cpu == NON_BOOT_CPU)
 			{
-#ifndef CONFIG_SEC_DVFS_UNI
+#ifndef CONFIG_SEC_DVFS_UNI			
 				unsigned int cur, min, max;
 				
 				/* get current freq & update now */
@@ -1990,7 +1967,7 @@ int cpufreq_unregister_driver(struct cpufreq_driver *driver)
 
 	if (!cpufreq_driver || (driver != cpufreq_driver))
 		return -EINVAL;
-	
+
 	pr_debug("unregistering driver %s\n", driver->name);
 
 	sysdev_driver_unregister(&cpu_sysdev_class, &cpufreq_sysdev_driver);

@@ -1,4 +1,4 @@
-/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2010, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -125,10 +125,8 @@ u32 adie_codec_freq_supported(struct adie_codec_dev_profile *profile,
 		if (cur_adie_ops->codec_freq_supported != NULL)
 			rc = cur_adie_ops->codec_freq_supported(profile,
 							requested_freq);
-	} else {
-		pr_info("%s : cur_adie_ops is NULL\n", __func__);
+	} else
 		rc = -ENODEV;
-	}
 
 	return rc;
 }

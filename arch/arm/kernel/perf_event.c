@@ -27,7 +27,6 @@
 #include <asm/pmu.h>
 #include <asm/stacktrace.h>
 #include <linux/cpu_pm.h>
-#include <linux/percpu.h>
 
 static struct platform_device *pmu_device;
 
@@ -98,10 +97,6 @@ struct arm_pmu {
 
 /* Set at runtime when we know what CPU type we are. */
 static const struct arm_pmu *armpmu;
-
-#if defined(CONFIG_ARCH_MSM8X60)
-static struct arm_pmu_platdata __percpu **armpmu_percpu_pdata;
-#endif
 
 enum arm_perf_pmu_ids
 armpmu_get_pmu_id(void)
@@ -444,28 +439,9 @@ armpmu_reserve_hardware(void)
 		if (irq < 0)
 			continue;
 
-#if defined(CONFIG_ARCH_MSM8X60)
-		armpmu_percpu_pdata = alloc_percpu(struct arm_pmu_platdata *);
-		if (!armpmu_percpu_pdata) {
-			pr_err("%s: memory allocation failed for percpu data\n",
-					__func__);
-			return -ENOMEM;
-		}
-
-		*__this_cpu_ptr(armpmu_percpu_pdata) = plat;
-
-		err = request_percpu_irq(irq, handle_irq,
-				  "armpmu", armpmu_percpu_pdata);
-
-		enable_percpu_irq(irq, 0);
-#else
 		err = armpmu->request_pmu_irq(irq, &handle_irq);
-#endif
+
 		if (err) {
-#if defined(CONFIG_ARCH_MSM8X60)
-			disable_percpu_irq(irq);
-			free_percpu(armpmu_percpu_pdata);
-#endif
 			pr_warning("unable to request IRQ%d for ARM perf "
 				"counters\n", irq);
 			break;
@@ -475,14 +451,8 @@ armpmu_reserve_hardware(void)
 	if (err) {
 		for (i = i - 1; i >= 0; --i) {
 			irq = platform_get_irq(pmu_device, i);
-			if (irq >= 0)
-#if defined(CONFIG_ARCH_MSM8X60)
-				disable_percpu_irq(irq);
-				free_percpu_irq(irq, NULL);
-				free_percpu(armpmu_percpu_pdata);
-#else
+
 			armpmu->free_pmu_irq(irq);
-#endif
 		}
 		release_pmu(pmu_device);
 		pmu_device = NULL;
@@ -498,15 +468,7 @@ armpmu_release_hardware(void)
 
 	for (i = pmu_device->num_resources - 1; i >= 0; --i) {
 		irq = platform_get_irq(pmu_device, i);
-		if (irq >= 0) {
-#if defined(CONFIG_ARCH_MSM8X60)
-			disable_percpu_irq(irq);
-			free_percpu_irq(irq, NULL);
-			free_percpu(armpmu_percpu_pdata);
-#else
 		armpmu->free_pmu_irq(irq);
-#endif
-		}
 	}
 	armpmu->stop();
 
@@ -689,26 +651,6 @@ static void armpmu_update_counters(void)
 	}
 }
 
-static int cpu_has_active_perf(void)
-{
-	int idx;
-	struct cpu_hw_events *cpuc = &__get_cpu_var(cpu_hw_events);
-
-	if (!armpmu)
-		return 0;
-
-	for (idx = 0; idx <= armpmu->num_events; ++idx) {
-		struct perf_event *event = cpuc->events[idx];
-
-		if (event)
-			/*Even one event's existence is good enough.*/
-			return 1;
-
-	}
-
-	return 0;
-}
-
 static struct pmu pmu = {
 	.pmu_enable	= armpmu_enable,
 	.pmu_disable	= armpmu_disable,
@@ -734,18 +676,16 @@ static int perf_cpu_pm_notifier(struct notifier_block *self, unsigned long cmd,
 {
 	switch (cmd) {
 	case CPU_PM_ENTER:
-		if (cpu_has_active_perf()) {
-			armpmu_update_counters();
-			perf_pmu_disable(&pmu);
-		}
+		armpmu_update_counters();
+		perf_pmu_disable(&pmu);
 		break;
 
 	case CPU_PM_ENTER_FAILED:
 	case CPU_PM_EXIT:
-		if (cpu_has_active_perf() && armpmu->reset) {
+		if (armpmu && armpmu->reset)
 			armpmu->reset(NULL);
-			perf_pmu_enable(&pmu);
-		}
+		perf_pmu_enable(&pmu);
+
 		break;
 	}
 

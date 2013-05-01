@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2008-2012, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -35,6 +35,15 @@
 #include "mdp.h"
 #include "mdp4.h"
 
+struct mdp4_overlay_perf {
+	u32 mdp_clk_rate;
+	u32 use_ov0_blt;
+	u32 use_ov1_blt;
+	u32 mdp_bw;
+};
+
+extern struct mdp4_overlay_perf perf_current;
+
 u32 dsi_irq;
 u32 esc_byte_ratio;
 
@@ -43,13 +52,8 @@ static boolean tlmm_settings = FALSE;
 static int mipi_dsi_probe(struct platform_device *pdev);
 static int mipi_dsi_remove(struct platform_device *pdev);
 
- int mipi_dsi_off(struct platform_device *pdev);
- int mipi_dsi_on(struct platform_device *pdev);
-
-#if defined(CONFIG_USA_MODEL_SGH_I717) || defined (CONFIG_JPN_MODEL_SC_05D)
-static int mipi_dsi_shutdown(struct platform_device *pdev);
-#endif
-
+static int mipi_dsi_off(struct platform_device *pdev);
+static int mipi_dsi_on(struct platform_device *pdev);
 
 static struct platform_device *pdev_list[MSM_FB_MAX_DEV_LIST];
 static int pdev_list_cnt;
@@ -60,11 +64,7 @@ static int vsync_gpio = -1;
 static struct platform_driver mipi_dsi_driver = {
 	.probe = mipi_dsi_probe,
 	.remove = mipi_dsi_remove,
-#if defined(CONFIG_USA_MODEL_SGH_I717) || defined (CONFIG_JPN_MODEL_SC_05D)
-	.shutdown = mipi_dsi_shutdown,
-#else
 	.shutdown = NULL,
-#endif
 	.driver = {
 		   .name = "mipi_dsi",
 		   },
@@ -72,7 +72,7 @@ static struct platform_driver mipi_dsi_driver = {
 
 struct device dsi_dev;
 
-int mipi_dsi_off(struct platform_device *pdev)
+static int mipi_dsi_off(struct platform_device *pdev)
 {
 	int ret = 0;
 	struct msm_fb_data_type *mfd;
@@ -96,14 +96,6 @@ int mipi_dsi_off(struct platform_device *pdev)
 		/* make sure dsi_cmd_mdp is idle */
 		mipi_dsi_cmd_mdp_busy();
 	}
-
-	/* make sure dsi clk is on so that
-	 * dcs commands can be sent
-	 */
-	mipi_dsi_clk_cfg(1);
-
-	/* make sure dsi_cmd_mdp is idle */
-	mipi_dsi_cmd_mdp_busy();
 
 	/*
 	 * Desctiption: change to DSI_CMD_MODE since it needed to
@@ -150,11 +142,12 @@ int mipi_dsi_off(struct platform_device *pdev)
 	else
 		up(&mfd->dma->mutex);
 
+	pr_debug("%s-:\n", __func__);
+
 	return ret;
 }
 
-extern struct mdp4_overlay_perf perf_current;
-int mipi_dsi_on(struct platform_device *pdev)
+static int mipi_dsi_on(struct platform_device *pdev)
 {
 	int ret = 0;
 	u32 clk_rate;
@@ -340,24 +333,11 @@ int mipi_dsi_on(struct platform_device *pdev)
 	else
 		up(&mfd->dma->mutex);
 
-	return ret;
-}
-
-#if defined(CONFIG_USA_MODEL_SGH_I717) || defined (CONFIG_JPN_MODEL_SC_05D)
-static int mipi_dsi_shutdown(struct platform_device *pdev)
-{
-	int ret = 0;
-	printk("%s:+\n", __func__);
-
-	msleep(200);
-	if (mipi_dsi_pdata && mipi_dsi_pdata->dsi_power_save)
-		mipi_dsi_pdata->dsi_power_save(0x10);
-
-	printk("%s:-\n", __func__);
+	pr_debug("%s-:\n", __func__);
 
 	return ret;
 }
-#endif
+
 
 static int mipi_dsi_resource_initialized;
 
@@ -672,6 +652,4 @@ static int __init mipi_dsi_driver_init(void)
 	return ret;
 }
 
-EXPORT_SYMBOL(mipi_dsi_on);
-EXPORT_SYMBOL(mipi_dsi_off);
 module_init(mipi_dsi_driver_init);

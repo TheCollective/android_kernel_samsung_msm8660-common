@@ -3,7 +3,7 @@
  *
  *  Copyright (C) 2007 Google Inc,
  *  Copyright (C) 2003 Deep Blue Solutions, Ltd, All Rights Reserved.
- *  Copyright (c) 2009-2012, Code Aurora Forum. All rights reserved.
+ *  Copyright (c) 2009-2012, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -508,11 +508,7 @@ msmsdcc_dma_complete_tlet(unsigned long data)
 			goto out;
 		}
 		msmsdcc_stop_data(host);
-
-		if (mrq->data->stop && ((mrq->sbc && mrq->data->error)
-				|| !mrq->sbc)) {
-			msmsdcc_start_command(host, mrq->data->stop, 0);
-		} else if (!mrq->data->stop || mrq->cmd->error ||
+		if (!mrq->data->stop || mrq->cmd->error ||
 			(mrq->sbc && !mrq->data->error)) {
 			mrq->data->bytes_xfered = host->curr.data_xfered;
 			del_timer(&host->req_tout_timer);
@@ -525,6 +521,9 @@ msmsdcc_dma_complete_tlet(unsigned long data)
 
 			mmc_request_done(host->mmc, mrq);
 			return;
+		} else if (mrq->data->stop && ((mrq->sbc && mrq->data->error)
+				|| !mrq->sbc)) {
+			msmsdcc_start_command(host, mrq->data->stop, 0);
 		}
 	}
 
@@ -669,10 +668,7 @@ static void msmsdcc_sps_complete_tlet(unsigned long data)
 			return;
 		}
 		msmsdcc_stop_data(host);
-		if (mrq->data->stop && ((mrq->sbc && mrq->data->error)
-				|| !mrq->sbc)) {
-			msmsdcc_start_command(host, mrq->data->stop, 0);
-		} else if (!mrq->data->stop || mrq->cmd->error ||
+		if (!mrq->data->stop || mrq->cmd->error ||
 			(mrq->sbc && !mrq->data->error)) {
 			mrq->data->bytes_xfered = host->curr.data_xfered;
 			del_timer(&host->req_tout_timer);
@@ -685,6 +681,9 @@ static void msmsdcc_sps_complete_tlet(unsigned long data)
 
 			mmc_request_done(host->mmc, mrq);
 			return;
+		} else if (mrq->data->stop && ((mrq->sbc && mrq->data->error)
+				|| !mrq->sbc)) {
+			msmsdcc_start_command(host, mrq->data->stop, 0);
 		}
 	}
 	spin_unlock_irqrestore(&host->lock, flags);
@@ -981,7 +980,7 @@ static void
 msmsdcc_start_command_deferred(struct msmsdcc_host *host,
 				struct mmc_command *cmd, u32 *c)
 {
-	DBG(host, "op %d arg %08x flags %08x\n",
+	DBG(host, "op %02x arg %08x flags %08x\n",
 	    cmd->opcode, cmd->arg, cmd->flags);
 
 	*c |= (cmd->opcode | MCI_CPSM_ENABLE);
@@ -1370,19 +1369,22 @@ static void msmsdcc_sg_consumed(struct msmsdcc_host *host,
 				unsigned int length)
 {
 	struct msmsdcc_pio_data *pio = &host->pio;
-
-	if (host->curr.data->flags & MMC_DATA_READ) {
-		if (length > pio->sg_miter.consumed)
-			/*
-			 * consumed 4 bytes, but sgl
-			 * describes < 4 bytes
-			 */
-			_msmsdcc_sg_consume_word(host);
-		else
-			pio->sg_miter.consumed = length;
-	} else
-		if (length < pio->sg_miter.consumed)
-			pio->sg_miter.consumed = length;
+	if(host->curr.data != NULL )
+	{
+		if (host->curr.data->flags & MMC_DATA_READ) {
+			if (length > pio->sg_miter.consumed)
+				/*
+				 * consumed 4 bytes, but sgl
+				 * describes < 4 bytes
+				 */
+				_msmsdcc_sg_consume_word(host);
+			else
+				pio->sg_miter.consumed = length;
+		} else
+			if (length < pio->sg_miter.consumed)
+				pio->sg_miter.consumed = length;
+	}else
+		printk(KERN_ERR "%s:host->curr.data is NULL\n",__func__);
 }
 
 static void msmsdcc_sg_start(struct msmsdcc_host *host)
@@ -1559,16 +1561,9 @@ static void msmsdcc_do_cmdirq(struct msmsdcc_host *host, uint32_t status)
 		else if (host->curr.data) { /* Non DMA */
 			msmsdcc_reset_and_restore(host);
 			msmsdcc_stop_data(host);
-			if (cmd->data && cmd->data->stop)
-				msmsdcc_start_command(host,
-						cmd->data->stop, 0);
-			else
-				msmsdcc_request_end(host, cmd->mrq);
+			msmsdcc_request_end(host, cmd->mrq);
 		} else { /* host->data == NULL */
-			if (cmd->data && cmd->data->stop) {
-				msmsdcc_start_command(host,
-						cmd->data->stop, 0);
-			} else if (!cmd->error && host->prog_enable) {
+			if (!cmd->error && host->prog_enable) {
 				if (status & MCI_PROGDONE) {
 					host->prog_enable = 0;
 					msmsdcc_request_end(host, cmd->mrq);
@@ -1646,9 +1641,9 @@ msmsdcc_irq(int irq, void *dev_id)
 		}
 
 		status = readl_relaxed(host->base + MMCISTATUS);
-		status = (readl_relaxed(host->base + MMCIMASK0) & status) & ~(MCI_IRQ_PIO);
 
-		if (status == 0)
+		if (((readl_relaxed(host->base + MMCIMASK0) & status) &
+						(~(MCI_IRQ_PIO))) == 0)
 			break;
 
 #if IRQ_DEBUG
@@ -1677,10 +1672,10 @@ msmsdcc_irq(int irq, void *dev_id)
 			if (status & (MCI_PROGDONE | MCI_CMDCRCFAIL |
 					  MCI_CMDTIMEOUT)) {
 				if (status & MCI_CMDTIMEOUT)
-					pr_err("%s: dummy CMD52 timeout\n",
+					pr_debug("%s: dummy CMD52 timeout\n",
 						mmc_hostname(host->mmc));
 				if (status & MCI_CMDCRCFAIL)
-					pr_err("%s: dummy CMD52 CRC failed\n",
+					pr_debug("%s: dummy CMD52 CRC failed\n",
 						mmc_hostname(host->mmc));
 				host->dummy_52_sent = 0;
 				host->dummy_52_needed = 0;
@@ -2571,6 +2566,9 @@ static void msmsdcc_msm_bus_cancel_work_and_set_vote(
 	unsigned int bw;
 	int vote;
 
+	if(host->plat->is_sdio_al_client)
+		return;
+		
 	if (!host->msm_bus_vote.client_handle)
 		return;
 
@@ -3576,17 +3574,12 @@ msmsdcc_check_status(unsigned long data)
 	unsigned int status;
 
 	if (host->plat->status || host->plat->status_gpio) {
-		if (host->plat->status) {
+		if (host->plat->status)
 			status = host->plat->status(mmc_dev(host->mmc));
-			host->eject = !status;
-		} else {
+		else
 			status = msmsdcc_slot_status(host);
 
-			if (host->plat->is_status_gpio_active_low)
-				host->eject = status;
-			else
-				host->eject = !status;
-		}
+		host->eject = !status;
 
 		if (status ^ host->oldstat) {
 			if (host->plat->status)
@@ -4725,8 +4718,6 @@ msmsdcc_probe(struct platform_device *pdev)
 		mmc->caps |= (MMC_CAP_SET_XPC_330 | MMC_CAP_SET_XPC_300 |
 				MMC_CAP_SET_XPC_180);
 
-	mmc->caps2 |= MMC_CAP2_BOOTPART_NOACC;
-
 	if (plat->nonremovable)
 		mmc->caps |= MMC_CAP_NONREMOVABLE;
 #ifdef CONFIG_MMC_MSM_SDIO_SUPPORT
@@ -4805,17 +4796,12 @@ msmsdcc_probe(struct platform_device *pdev)
 	 */
 
 	if (plat->status || plat->status_gpio) {
-		if (plat->status) {
+		if (plat->status)
 			host->oldstat = plat->status(mmc_dev(host->mmc));
-			host->eject = !host->oldstat;
-		} else {
+		else
 			host->oldstat = msmsdcc_slot_status(host);
 
-			if (host->plat->is_status_gpio_active_low)
-				host->eject = host->oldstat;
-			else
-				host->eject = !host->oldstat;
-		}
+		host->eject = !host->oldstat;
 	}
 
 	if (plat->status_irq) {
@@ -5176,8 +5162,8 @@ msmsdcc_runtime_suspend(struct device *dev)
 {
 	struct mmc_host *mmc = dev_get_drvdata(dev);
 	struct msmsdcc_host *host = mmc_priv(mmc);
-	unsigned long flags;
 	int rc = 0;
+	unsigned long flags;
 
 	if (host->plat->is_sdio_al_client) {
 		rc = 0;
@@ -5190,6 +5176,7 @@ msmsdcc_runtime_suspend(struct device *dev)
 	}
 
 	pr_debug("%s: %s: start\n", mmc_hostname(mmc), __func__);
+
 	if (mmc) {
 		host->sdcc_suspending = 1;
 		mmc->suspend_task = current;
@@ -5259,11 +5246,8 @@ msmsdcc_runtime_resume(struct device *dev)
 	if (host->plat->is_sdio_al_client)
 		return 0;
 
-	if (host->pdev_id == 4) {
-		printk(KERN_INFO "%s: Enter WIFI resume\n", __func__);
-	}
-
 	pr_debug("%s: %s: start\n", mmc_hostname(mmc), __func__);
+
 	if (mmc) {
 		if (mmc->card && mmc_card_sdio(mmc->card) &&
 				mmc_card_keep_power(mmc)) {

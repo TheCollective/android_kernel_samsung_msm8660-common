@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -445,6 +445,23 @@ int32_t msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl, void __user *argp)
 				s_ctrl,
 				cdata.mode,
 				&(cdata.cfg.init_info));
+			break;
+
+		case CFG_GET_OUTPUT_INFO:
+			if (s_ctrl->func_tbl->
+			sensor_get_output_info == NULL) {
+				rc = -EFAULT;
+				break;
+			}
+			rc = s_ctrl->func_tbl->
+				sensor_get_output_info(
+				s_ctrl,
+				&cdata.cfg.output_info);
+
+			if (copy_to_user((void *)argp,
+				&cdata,
+				sizeof(struct sensor_cfg_data)))
+				rc = -EFAULT;
 			break;
 
 		case CFG_GET_EEPROM_DATA:

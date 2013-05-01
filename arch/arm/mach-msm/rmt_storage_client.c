@@ -1,4 +1,4 @@
-/* Copyright (c) 2009-2011, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2009-2011, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1716,10 +1716,8 @@ static int __init rmt_storage_init(void)
 
 	rmc->workq = create_singlethread_workqueue("rmt_storage");
 	if (!rmc->workq)
-	{   
-		ret = -ENOMEM;
-		goto unreg_mdm_rpc; 
-	}
+		return -ENOMEM;
+
 #ifdef CONFIG_MSM_RMT_STORAGE_CLIENT_STATS
 	stats_dentry = debugfs_create_file("rmt_storage_stats", 0444, 0,
 					NULL, &debug_ops);

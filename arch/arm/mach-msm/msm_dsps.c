@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -501,12 +501,6 @@ static int dsps_alloc_resources(struct platform_device *pdev)
 
 	drv->ppss_base = ioremap(ppss_res->start,
 				 resource_size(ppss_res));
-
-	if (!drv->ppss_base) {
-		pr_err("%s: unable to remap memory\n", __func__);
-		ret = -ENOMEM;
-		goto reg_err;
-	}
 
 	ppss_wdog = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
 						"ppss_wdog");

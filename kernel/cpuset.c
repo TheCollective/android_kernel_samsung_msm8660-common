@@ -2187,7 +2187,7 @@ void cpuset_cpus_allowed(struct task_struct *tsk, struct cpumask *pmask)
 	mutex_unlock(&callback_mutex);
 }
 
-void cpuset_cpus_allowed_fallback(struct task_struct *tsk)
+int cpuset_cpus_allowed_fallback(struct task_struct *tsk)
 {
 	const struct cpuset *cs;
 	int cpu;
@@ -2211,10 +2211,22 @@ void cpuset_cpus_allowed_fallback(struct task_struct *tsk)
 	 * changes in tsk_cs()->cpus_allowed. Otherwise we can temporary
 	 * set any mask even if it is not right from task_cs() pov,
 	 * the pending set_cpus_allowed_ptr() will fix things.
-	 *
-	 * select_fallback_rq() will fix things ups and set cpu_possible_mask
-	 * if required.
 	 */
+
+	cpu = cpumask_any_and(&tsk->cpus_allowed, cpu_active_mask);
+	if (cpu >= nr_cpu_ids) {
+		/*
+		 * Either tsk->cpus_allowed is wrong (see above) or it
+		 * is actually empty. The latter case is only possible
+		 * if we are racing with remove_tasks_in_empty_cpuset().
+		 * Like above we can temporary set any mask and rely on
+		 * set_cpus_allowed_ptr() as synchronization point.
+		 */
+		do_set_cpus_allowed(tsk, cpu_possible_mask);
+		cpu = cpumask_any(cpu_active_mask);
+	}
+
+	return cpu;
 }
 
 void cpuset_init_current_mems_allowed(void)
@@ -2494,8 +2506,16 @@ void cpuset_print_task_mems_allowed(struct task_struct *tsk)
 
 	dentry = task_cs(tsk)->css.cgroup->dentry;
 	spin_lock(&cpuset_buffer_lock);
-	snprintf(cpuset_name, CPUSET_NAME_LEN,
-		 dentry ? (const char *)dentry->d_name.name : "/");
+
+	if (!dentry) {
+		strcpy(cpuset_name, "/");
+	} else {
+		spin_lock(&dentry->d_lock);
+		strlcpy(cpuset_name, (const char *)dentry->d_name.name,
+			CPUSET_NAME_LEN);
+		spin_unlock(&dentry->d_lock);
+	}
+
 	nodelist_scnprintf(cpuset_nodelist, CPUSET_NODELIST_LEN,
 			   tsk->mems_allowed);
 	printk(KERN_INFO "%s cpuset=%s mems_allowed=%s\n",

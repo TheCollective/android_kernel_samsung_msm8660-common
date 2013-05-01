@@ -1,4 +1,4 @@
-/* Copyright (c) 2010-2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2010-2012, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -20,7 +20,7 @@
 #include <mach/dma.h>
 #include <asm/mach/mmc.h>
 #include <asm/clkdev.h>
-#include <linux/msm_kgsl.h>
+#include <mach/kgsl.h>
 #include <linux/msm_rotator.h>
 #include <mach/msm_hsusb.h>
 #include "footswitch.h"
@@ -116,7 +116,6 @@ static void charm_ap2mdm_kpdpwr_off(void)
 		msleep(100);
 	}
 	gpio_direction_output(AP2MDM_ERRFATAL, 0);
-
 #if defined(CONFIG_TARGET_LOCALE_USA)
 	/* When PM8058 has already shut down, PM8028 is still pulsing.
 	 * After shut down the MDM9K by AP2MDM_STATUS , 
@@ -187,6 +186,8 @@ void __init msm8x60_init_irq(void)
 	msm_mpm_irq_extn_init();
 	gic_init(0, GIC_PPI_START, MSM_QGIC_DIST_BASE, (void *)MSM_QGIC_CPU_BASE);
 
+	/* Edge trigger PPIs except AVS_SVICINT and AVS_SVICINTSWDONE */
+	writel(0xFFFFD7FF, MSM_QGIC_DIST_BASE + GIC_DIST_CONFIG + 4);
 }
 
 #define MSM_LPASS_QDSP6SS_PHYS 0x28800000
@@ -366,7 +367,6 @@ struct platform_device *msm_add_gsbi9_uart(void)
 }
 #endif
 
-#if !defined (CONFIG_SAMSUNG_8X60_TABLET)
 #if defined (CONFIG_TARGET_LOCALE_USA)
 static struct resource gsbi1_qup_i2c_resources[] = {
 	{
@@ -389,8 +389,6 @@ static struct resource gsbi1_qup_i2c_resources[] = {
 	},
 };
 #endif
-#endif
-
 static struct resource gsbi3_qup_i2c_resources[] = {
 	{
 		.name	= "qup_phys_addr",
@@ -794,7 +792,7 @@ static struct kgsl_device_platform_data kgsl_3d0_pdata = {
 	.init_level = 0,
 	.num_levels = 5,
 	.set_grp_async = NULL,
-	.idle_timeout = HZ/12,
+	.idle_timeout = HZ/12, // HZ/5 -> HZ/15, changed for low power consumption
 	.nap_allowed = true,
 	.clk_map = KGSL_CLK_CORE | KGSL_CLK_IFACE | KGSL_CLK_MEM_IFACE,
 #ifdef CONFIG_MSM_BUS_SCALING
@@ -891,14 +889,6 @@ static struct kgsl_device_platform_data kgsl_2d1_pdata = {
 	.idle_timeout = HZ/10,
 	.nap_allowed = true,
 	.clk_map = KGSL_CLK_CORE | KGSL_CLK_IFACE,
-#if 0	// ICS ES2
-	.clk = {
-		.name = {
-			/* note: 2d clocks disabled on v1 */
-			.clk = "core_clk",
-			.pclk = "iface_clk",
-		},
-#endif
 #ifdef CONFIG_MSM_BUS_SCALING
 	.bus_scale_table = &grp2d1_bus_scale_pdata,
 #endif
@@ -928,11 +918,8 @@ void __init msm8x60_check_2d_hardware(void)
 		kgsl_2d0_pdata.clk_map = 0;
 	}
 }
-
-#if !defined (CONFIG_SAMSUNG_8X60_TABLET)
 #if defined (CONFIG_TARGET_LOCALE_USA)
 #define MSM_A2220_I2C_BUS_ID		16	
-
 /* Use GSBI1 QUP for /dev/i2c-0 */
 struct platform_device msm_gsbi1_qup_i2c_device = {
 	.name		= "qup_i2c",
@@ -940,7 +927,6 @@ struct platform_device msm_gsbi1_qup_i2c_device = {
 	.num_resources	= ARRAY_SIZE(gsbi1_qup_i2c_resources),
 	.resource	= gsbi1_qup_i2c_resources,
 };
-#endif
 #endif
 
 /* Use GSBI3 QUP for /dev/i2c-0 */
@@ -2063,8 +2049,13 @@ struct platform_device msm_device_smd = {
 };
 
 static struct msm_watchdog_pdata msm_watchdog_pdata = {
-	.pet_time = 3000,
-	.bark_time = 15000,
+#ifdef CONFIG_SEC_DEBUG // msm_watchdog.c doesn't use boot command line.
+	.pet_time = 10000,
+	.bark_time = 20000,
+#else
+	.pet_time = 10000,
+	.bark_time = 11000,
+#endif
 	.has_secure = true,
 };
 

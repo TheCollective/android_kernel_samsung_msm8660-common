@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -2099,7 +2099,7 @@ static irqreturn_t loop_change_irq_handler(int irq, void *data)
 	pr_debug("fsm_state=%d reg_loop=0x%x\n",
 		pm_chg_get_fsm_state(data),
 		pm_chg_get_regulation_loop(data));
-	schedule_work(&chip->unplug_check_work.work);
+	unplug_check_worker(&(chip->unplug_check_work.work));
 	return IRQ_HANDLED;
 }
 

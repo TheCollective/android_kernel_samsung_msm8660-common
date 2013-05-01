@@ -1,4 +1,4 @@
-/* Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -243,7 +243,7 @@ static int __devinit pil_q6v3_driver_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	desc = devm_kzalloc(&pdev->dev, sizeof(*desc), GFP_KERNEL);
-	if (!desc)
+	if (!drv)
 		return -ENOMEM;
 
 	drv->pll = clk_get(&pdev->dev, "pll4");

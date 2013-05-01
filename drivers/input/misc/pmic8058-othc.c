@@ -1,4 +1,4 @@
-/* Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -613,8 +613,7 @@ static irqreturn_t pm8058_no_sw(int irq, void *dev_id)
  */
 static irqreturn_t pm8058_nc_ir(int irq, void *dev_id)
 {
-	unsigned long flags;
-	long rc;
+	unsigned long flags, rc;
 	struct pm8058_othc *dd = dev_id;
 
 	spin_lock_irqsave(&dd->lock, flags);

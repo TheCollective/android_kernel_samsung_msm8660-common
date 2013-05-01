@@ -2,7 +2,7 @@
  *  HCI_SMD (HCI Shared Memory Driver) is Qualcomm's Shared memory driver
  *  for the BT HCI protocol.
  *
- *  Copyright (c) 2000-2001, 2011-2012 Code Aurora Forum. All rights reserved.
+ *  Copyright (c) 2000-2001, 2011-2012 The Linux Foundation. All rights reserved.
  *  Copyright (C) 2002-2003  Maxim Krasnyansky <maxk@qualcomm.com>
  *  Copyright (C) 2004-2006  Marcel Holtmann <marcel@holtmann.org>
  *
@@ -35,8 +35,12 @@
 
 #define EVENT_CHANNEL		"APPS_RIVA_BT_CMD"
 #define DATA_CHANNEL		"APPS_RIVA_BT_ACL"
-#define RX_Q_MONITOR		(2000)	/* 1 milli second */
-#define HCI_REGISTER_SET		0
+/* release wakelock in 500ms, not immediately, because higher layers
+ * don't always take wakelocks when they should
+ * This is derived from the implementation for UART transport
+ */
+
+#define RX_Q_MONITOR		(500)	/* 500 milli second */
 
 
 static int hcismd_set;
@@ -52,7 +56,7 @@ static void hci_dev_restart(struct work_struct *worker);
 
 struct hci_smd_data {
 	struct hci_dev *hdev;
-	unsigned long flags;
+
 	struct smd_channel *event_channel;
 	struct smd_channel *data_channel;
 	struct wake_lock wake_lock_tx;
@@ -467,12 +471,6 @@ static int hci_smd_register_smd(struct hci_smd_data *hsmd)
 static void hci_smd_deregister_dev(struct hci_smd_data *hsmd)
 {
 	tasklet_kill(&hs.rx_task);
-
-	if (!test_and_clear_bit(HCI_REGISTER_SET, &hsmd->flags)) {
-		BT_ERR("HCI device un-registered already");
-		return;
-	} else
-		BT_INFO("HCI device un-registration going on");
 
 	if (hsmd->hdev) {
 		if (hci_unregister_dev(hsmd->hdev) < 0)

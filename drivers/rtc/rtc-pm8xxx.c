@@ -1,4 +1,4 @@
-/* Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -410,10 +410,6 @@ static int __devinit pm8xxx_rtc_probe(struct platform_device *pdev)
 	const struct pm8xxx_rtc_platform_data *pdata =
 		pdev->dev.platform_data;
 
-	/* Added by SEC */
-	struct rtc_time tm;
-	unsigned long tv_sec;
-
 	if (pdata != NULL)
 		rtc_write_enable = pdata->rtc_write_enable;
 
@@ -501,31 +497,6 @@ static int __devinit pm8xxx_rtc_probe(struct platform_device *pdev)
 	}
 
 	device_init_wakeup(&pdev->dev, 1);
-
-	/* Added by SEC */
-	rc = pm8xxx_rtc_read_time(&pdev->dev, &tm);
-	if (rc) {
-		pr_err("%s: Unable to read RTC time\n", __func__);
-	}
-	rtc_tm_to_time(&tm, &tv_sec);
-
-	if ( tm.tm_year + 1900 < 2012 ) {
-		pr_debug("rtc year is below 2012. initialize to 2012-01-01\n");
-		tm.tm_year = (2012 - 1900);
-		tm.tm_mon = (1 - 1);
-		tm.tm_mday = 1;
-		tm.tm_hour = 0;
-		tm.tm_min = 0;
-		tm.tm_sec = 0;
-		rtc_tm_to_time(&tm, &tv_sec);
-
-		if (rtc_write_enable == true) {
-			rc = pm8xxx_rtc_set_time(&pdev->dev, &tm);
-			if (rc) {
-				pr_err("%s: Unable to write RTC time\n", __func__);
-			}
-		}
-	}
 
 	dev_dbg(&pdev->dev, "Probe success !!\n");
 

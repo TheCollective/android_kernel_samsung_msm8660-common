@@ -731,6 +731,7 @@ void ext4_mb_generate_buddy(struct super_block *sb,
 	grp->bb_fragments = fragments;
 
 	if (free != grp->bb_free) {
+		print_block_data(sb, 0, bitmap, 0, EXT4_BLOCK_SIZE(sb));
 		ext4_grp_locked_error(sb, group, 0, 0,
 				      "%u blocks in bitmap, %u in gd",
 				      free, grp->bb_free);
@@ -1338,6 +1339,8 @@ static void mb_free_blocks(struct inode *inode, struct ext4_buddy *e4b,
 
 			blocknr = ext4_group_first_block_no(sb, e4b->bd_group);
 			blocknr += block;
+			print_block_data(sb, blocknr, e4b->bd_bitmap, 0,
+					EXT4_BLOCK_SIZE(sb));
 			ext4_grp_locked_error(sb, e4b->bd_group,
 					      inode ? inode->i_ino : 0,
 					      blocknr,
@@ -2814,8 +2817,8 @@ ext4_mb_mark_diskspace_used(struct ext4_allocation_context *ac,
 	if (sbi->s_log_groups_per_flex) {
 		ext4_group_t flex_group = ext4_flex_group(sbi,
 							  ac->ac_b_ex.fe_group);
-		atomic_sub(ac->ac_b_ex.fe_len,
-			   &sbi->s_flex_groups[flex_group].free_blocks);
+		atomic64_sub(ac->ac_b_ex.fe_len,
+			     &sbi->s_flex_groups[flex_group].free_blocks);
 	}
 
 	err = ext4_handle_dirty_metadata(handle, NULL, bitmap_bh);
@@ -4111,7 +4114,7 @@ static void ext4_mb_add_n_trim(struct ext4_allocation_context *ac)
 		/* The max size of hash table is PREALLOC_TB_SIZE */
 		order = PREALLOC_TB_SIZE - 1;
 	/* Add the prealloc space to lg */
-	rcu_read_lock();
+	spin_lock(&lg->lg_prealloc_lock);
 	list_for_each_entry_rcu(tmp_pa, &lg->lg_prealloc_list[order],
 						pa_inode_list) {
 		spin_lock(&tmp_pa->pa_lock);
@@ -4135,12 +4138,12 @@ static void ext4_mb_add_n_trim(struct ext4_allocation_context *ac)
 	if (!added)
 		list_add_tail_rcu(&pa->pa_inode_list,
 					&lg->lg_prealloc_list[order]);
-	rcu_read_unlock();
+	spin_unlock(&lg->lg_prealloc_lock);
 
 	/* Now trim the list to be not more than 8 elements */
 	if (lg_prealloc_count > 8) {
 		ext4_mb_discard_lg_preallocations(sb, lg,
-						order, lg_prealloc_count);
+						  order, lg_prealloc_count);
 		return;
 	}
 	return ;
@@ -4614,7 +4617,7 @@ do_more:
 
 	if (sbi->s_log_groups_per_flex) {
 		ext4_group_t flex_group = ext4_flex_group(sbi, block_group);
-		atomic_add(count, &sbi->s_flex_groups[flex_group].free_blocks);
+		atomic64_add(count, &sbi->s_flex_groups[flex_group].free_blocks);
 	}
 
 	ext4_mb_unload_buddy(&e4b);
@@ -4745,8 +4748,8 @@ void ext4_add_groupblocks(handle_t *handle, struct super_block *sb,
 
 	if (sbi->s_log_groups_per_flex) {
 		ext4_group_t flex_group = ext4_flex_group(sbi, block_group);
-		atomic_add(blocks_freed,
-			   &sbi->s_flex_groups[flex_group].free_blocks);
+		atomic64_add(blocks_freed,
+			     &sbi->s_flex_groups[flex_group].free_blocks);
 	}
 
 	ext4_mb_unload_buddy(&e4b);

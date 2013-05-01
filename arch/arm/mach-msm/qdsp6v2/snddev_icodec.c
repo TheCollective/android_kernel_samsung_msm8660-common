@@ -1,4 +1,4 @@
-/* Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -829,10 +829,6 @@ static int snddev_icodec_set_freq(struct msm_snddev_info *dev_info, u32 rate)
 	}
 
 	icodec = dev_info->private_data;
-	// Gon's debug message - Start
-	if ( icodec->data->profile == NULL )
-		pr_info("%s : icodec->data->profile is NULL\n", __func__);
-	// Gon's debug message - End
 	if (adie_codec_freq_supported(icodec->data->profile, rate) != 0) {
 		pr_err("%s: adie_codec_freq_supported() failed\n", __func__);
 		rc = -EINVAL;

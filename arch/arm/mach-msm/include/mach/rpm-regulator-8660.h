@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -116,9 +116,7 @@ enum rpm_vreg_id_8660 {
 	RPM_VREG_ID_PM8901_LVS2,
 	RPM_VREG_ID_PM8901_LVS3,
 	RPM_VREG_ID_PM8901_MVS0,
-	RPM_VREG_ID_PM8901_USB_OTG,
-	RPM_VREG_ID_PM8901_HDMI_MVS,
-	RPM_VREG_ID_8660_MAX_REAL = RPM_VREG_ID_PM8901_HDMI_MVS,
+	RPM_VREG_ID_8660_MAX_REAL = RPM_VREG_ID_PM8901_MVS0,
 
 	/* The following are IDs for regulator devices to enable pin control. */
 	RPM_VREG_ID_PM8058_L0_PC,

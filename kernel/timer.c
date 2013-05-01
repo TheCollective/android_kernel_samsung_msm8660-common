@@ -996,7 +996,6 @@ EXPORT_SYMBOL(try_to_del_timer_sync);
  */
 int del_timer_sync(struct timer_list *timer)
 {
-	int need_relax = 0;
 #ifdef CONFIG_LOCKDEP
 	unsigned long flags;
 
@@ -1019,10 +1018,6 @@ int del_timer_sync(struct timer_list *timer)
 		if (ret >= 0)
 			return ret;
 		cpu_relax();
-		if(need_relax++ > 0xff) {
-			need_relax = 0;
-			udelay(1);
-		}
 	}
 }
 EXPORT_SYMBOL(del_timer_sync);

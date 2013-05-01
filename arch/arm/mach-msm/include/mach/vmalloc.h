@@ -1,7 +1,7 @@
 /* arch/arm/mach-msm/include/mach/vmalloc.h
  *
  * Copyright (C) 2007 Google, Inc.
- * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2009, The Linux Foundation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -20,7 +20,7 @@
 #ifdef CONFIG_VMSPLIT_2G
 #define VMALLOC_END	  (PAGE_OFFSET + 0x7A000000)
 #else
-#define VMALLOC_END	  (PAGE_OFFSET + 0x3D000000)
+#define VMALLOC_END	  (PAGE_OFFSET + 0x3A000000)
 #endif
 
 #endif

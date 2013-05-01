@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1054,8 +1054,10 @@ static int acpuclk_8960_set_rate(int cpu, unsigned long rate,
 	unsigned long flags;
 	int rc = 0;
 
-	if (cpu > num_possible_cpus())
-		return -EINVAL;
+	if (cpu > num_possible_cpus()) {
+		rc = -EINVAL;
+		goto out;
+	}
 
 	if (reason == SETRATE_CPUFREQ || reason == SETRATE_HOTPLUG)
 		mutex_lock(&driver_lock);

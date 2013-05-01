@@ -2,7 +2,7 @@
  * drivers/serial/msm_serial.c - driver for msm7k serial device and console
  *
  * Copyright (C) 2007 Google, Inc.
- * Copyright (c) 2010-2012, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2012, The Linux Foundation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -124,9 +124,7 @@ static struct of_device_id msm_hsl_match_table[] = {
 };
 static struct dentry *debug_base;
 static inline void wait_for_xmitr(struct uart_port *port, int bits);
-#ifdef CONFIG_SERIAL_MSM_HSL_CONSOLE
 static int get_console_state(struct uart_port *port);
-#endif
 static inline void msm_hsl_write(struct uart_port *port,
 				 unsigned int val, unsigned int off)
 {
@@ -1101,9 +1099,7 @@ static void dump_hsl_regs(struct uart_port *port)
 	ncf = msm_hsl_read(port, regmap[vid][UARTDM_NCF_TX]);
 	txfs = msm_hsl_read(port, regmap[vid][UARTDM_TXFS]);
 	rxfs = msm_hsl_read(port, regmap[vid][UARTDM_RXFS]);
-#ifdef CONFIG_SERIAL_MSM_HSL_CONSOLE
 	con_state = get_console_state(port);
-#endif
 
 	msm_hsl_console_state[0] = sr;
 	msm_hsl_console_state[1] = isr;

@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -624,22 +624,6 @@ static int msm_mctl_open(struct msm_cam_media_controller *p_mctl,
 			pr_err("%s: msm_mctl_register_subdevs failed:%d\n",
 				__func__, rc);
 			goto register_sdev_failed;
-		}
-
-		/* then sensor - move sub dev later*/
-		rc = v4l2_subdev_call(p_mctl->sensor_sdev, core, s_power, 1);
-
-		if (rc < 0) {
-			pr_err("%s: isp init failed: %d\n", __func__, rc);
-			goto msm_open_done;
-		}
-		if (sync->actctrl.a_power_up)
-			rc = sync->actctrl.a_power_up(
-				sync->sdata->actuator_info);
-
-		if (rc < 0) {
-			pr_err("%s: act power failed:%d\n", __func__, rc);
-			goto msm_open_done;
 		}
 
 		/* then sensor - move sub dev later*/

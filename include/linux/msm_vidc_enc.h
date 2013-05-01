@@ -144,6 +144,7 @@
 #define VEN_INPUTFMT_NV12	1/* NV12 Linear */
 #define VEN_INPUTFMT_NV21	2/* NV21 Linear */
 #define VEN_INPUTFMT_NV12_16M2KA	3/* NV12 Linear */
+#define VEN_INPUTFMT_NV21_16M2KA	4
 
 /*Different allowed rotation modes.*/
 #define VEN_ROTATION_0	1/* 0 degrees */
@@ -445,6 +446,7 @@ struct venc_ioctl_msg{
 
 #define VEN_IOCTL_SET_METABUFFER_MODE \
 	_IOW(VEN_IOCTLBASE_ENC, 47, struct venc_ioctl_msg)
+
 
 /*IOCTL params:SET: InputData - unsigned int, OutputData - NULL.*/
 #define VEN_IOCTL_SET_EXTRADATA \
