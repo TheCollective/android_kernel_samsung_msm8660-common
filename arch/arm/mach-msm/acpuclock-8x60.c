@@ -46,7 +46,11 @@
  * The PLL hardware is capable of 384MHz to 1536MHz. The L_VALs
  * used for calibration should respect these limits. */
 #define L_VAL_SCPLL_CAL_MIN	0x08 /* =  432 MHz with 27MHz source */
+#ifdef CONFIG_USA_MODEL_SGH_I577
+#define L_VAL_SCPLL_CAL_MAX	0x17 /* = 1242 MHz with 27MHz source */
+#else
 #define L_VAL_SCPLL_CAL_MAX	0x1C /* = 1512 MHz with 27MHz source */
+#endif
 
 #define MAX_VDD_SC		1250000 /* uV */
 #define MAX_VDD_MEM		1250000 /* uV */
@@ -878,7 +882,7 @@ static unsigned int __init select_freq_plan(void)
 		speed_bin = (pte_efuse >> 4) & 0xF;
 
 	if (speed_bin == 0x1) {
-		max_khz = 1512000;
+		max_khz = MAX_FREQ_LIMIT;
 		pvs = (pte_efuse >> 10) & 0x7;
 		if (pvs == 0x7)
 			pvs = (pte_efuse >> 13) & 0x7;
@@ -901,6 +905,22 @@ static unsigned int __init select_freq_plan(void)
 			acpu_freq_tbl = acpu_freq_tbl_slow;
 			pr_warn("ACPU PVS: Unknown. Defaulting to slow.\n");
 			break;
+		}
+	} else if (speed_bin == 0x0 ) {
+		max_khz = MAX_FREQ_LIMIT;
+		pvs = (pte_efuse >> 10) & 0x7;
+                if (pvs == 0x7)
+                        pvs = (pte_efuse >> 13) & 0x7;
+
+                switch (pvs) {
+                case 0x0:
+			acpu_freq_tbl = acpu_freq_tbl_nom;
+                        pr_info("ACPU PVS: Nominal\n");
+                        break;
+		default:
+			acpu_freq_tbl = acpu_freq_tbl_slow;
+                        pr_warn("ACPU PVS: Unknown. Defaulting to slow.\n");
+                        break;
 		}
 	} else {
 		max_khz = 1188000;
